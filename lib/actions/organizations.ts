@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { canManageMembers, canManageOrganization } from "@/lib/auth/roles";
 import { requireProfile } from "@/lib/auth/session";
+import { getSiteUrl } from "@/lib/auth/site-url";
 import type { Organization, OrgRole } from "@/lib/types/database";
 import {
   addMemberSchema,
@@ -81,9 +82,54 @@ export async function updateOrganization(
   return { ok: true, data: undefined };
 }
 
+function isExistingAccountError(error: { message: string; code?: string }) {
+  const message = error.message.toLowerCase();
+  return (
+    error.code === "email_exists" ||
+    message.includes("already been registered") ||
+    message.includes("already registered") ||
+    message.includes("already exists")
+  );
+}
+
+async function findUserIdByEmail(email: string) {
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+
+  const { data, error } = await admin.rpc("user_id_by_email", {
+    lookup_email: email,
+  });
+
+  if (!error) {
+    return typeof data === "string" ? data : null;
+  }
+
+  // Live databases may not have the lookup function yet.
+  const normalized = email.toLowerCase();
+  for (let page = 1; page <= 10; page += 1) {
+    const { data: list, error: listError } = await admin.auth.admin.listUsers({
+      page,
+      perPage: 200,
+    });
+
+    if (listError) {
+      console.error("listUsers failed:", listError.message);
+      return null;
+    }
+
+    const match = list.users.find(
+      (entry) => entry.email?.toLowerCase() === normalized
+    );
+    if (match) return match.id;
+    if (list.users.length < 200) return null;
+  }
+
+  return null;
+}
+
 export async function addOrganizationMember(
   input: unknown
-): Promise<ActionResult> {
+): Promise<ActionResult<{ invited: boolean }>> {
   const parsed = addMemberSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -104,26 +150,48 @@ export async function addOrganizationMember(
   }
 
   let inviteeId: string | null = null;
+  let invited = false;
 
   try {
     const { createAdminClient } = await import("@/lib/supabase/admin");
     const admin = createAdminClient();
-    const { data: list, error: listError } = await admin.auth.admin.listUsers({
-      page: 1,
-      perPage: 200,
-    });
+    const siteUrl = await getSiteUrl();
+    const { data: invitedUser, error: inviteError } =
+      await admin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: `${siteUrl}/set-password`,
+      });
 
-    if (listError) {
-      console.error("listUsers failed:", listError.message);
-      return { ok: false, error: "Could not look up user by email" };
+    if (inviteError) {
+      if (!isExistingAccountError(inviteError)) {
+        console.error("inviteUserByEmail failed:", inviteError.message);
+        const message = inviteError.message.toLowerCase();
+        if (message.includes("rate limit")) {
+          return {
+            ok: false,
+            error: "Too many invitation emails were sent. Wait a few minutes and try again.",
+          };
+        }
+        return {
+          ok: false,
+          error:
+            "Could not send the invitation email. Check that Supabase Auth email is enabled, then try again.",
+        };
+      }
+
+      inviteeId = await findUserIdByEmail(email);
+      if (!inviteeId) {
+        return {
+          ok: false,
+          error:
+            "That email already has an account, but it could not be added to this organization.",
+        };
+      }
+    } else {
+      inviteeId = invitedUser.user?.id ?? null;
+      invited = true;
     }
-
-    const match = list.users.find(
-      (entry) => entry.email?.toLowerCase() === email.toLowerCase()
-    );
-    inviteeId = match?.id ?? null;
   } catch (error) {
-    console.error("Admin lookup failed:", error);
+    console.error("Admin invite failed:", error);
     return {
       ok: false,
       error: "Member invites require SUPABASE_SERVICE_ROLE_KEY on the server",
@@ -131,10 +199,18 @@ export async function addOrganizationMember(
   }
 
   if (!inviteeId) {
-    return {
-      ok: false,
-      error: "No Site Smarts user found with that email. They must sign in once first.",
-    };
+    return { ok: false, error: "The invitation did not return a user." };
+  }
+
+  const { data: existingMember } = await supabase
+    .from("organization_members")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("user_id", inviteeId)
+    .maybeSingle();
+
+  if (existingMember) {
+    return { ok: false, error: "That user is already a member" };
   }
 
   const { error } = await supabase.from("organization_members").insert({
@@ -148,11 +224,18 @@ export async function addOrganizationMember(
       return { ok: false, error: "That user is already a member" };
     }
     console.error("addOrganizationMember failed:", error.message);
+    if (invited) {
+      return {
+        ok: false,
+        error:
+          "The invitation email was sent, but they could not be added to the organization. Try again.",
+      };
+    }
     return { ok: false, error: "Could not add member" };
   }
 
   revalidatePath("/dashboard");
-  return { ok: true, data: undefined };
+  return { ok: true, data: { invited } };
 }
 
 export async function updateMemberRole(

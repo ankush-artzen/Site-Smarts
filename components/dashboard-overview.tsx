@@ -13,7 +13,8 @@ import { BatteryCharging, Gauge, SunMedium, Zap } from "lucide-react";
 
 import { CreateOrganizationForm } from "@/components/create-organization-form";
 import { CreateSiteForm } from "@/components/create-site-form";
-import { canManageSites } from "@/lib/auth/roles";
+import { InviteMemberForm } from "@/components/invite-member-form";
+import { canManageMembers, canManageSites } from "@/lib/auth/roles";
 import type {
   OrganizationWithRole,
   Site,
@@ -98,6 +99,8 @@ export function DashboardOverview({
 
   const canCreateSites =
     !!activeOrganization && canManageSites(activeOrganization.role);
+  const canInvite =
+    !!activeOrganization && canManageMembers(activeOrganization.role);
 
   return (
     <div className="space-y-8">
@@ -235,6 +238,15 @@ export function DashboardOverview({
       {canCreateSites && activeOrganization ? (
         <section className="animate-rise-delay-2 max-w-xl">
           <CreateSiteForm
+            organizationId={activeOrganization.id}
+            organizationName={activeOrganization.name}
+          />
+        </section>
+      ) : null}
+
+      {canInvite && activeOrganization ? (
+        <section className="max-w-xl">
+          <InviteMemberForm
             organizationId={activeOrganization.id}
             organizationName={activeOrganization.name}
           />
