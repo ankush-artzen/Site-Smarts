@@ -3,9 +3,13 @@ import { Suspense } from "react";
 import { DashboardLoadingState } from "@/components/dashboard-loading-state";
 import { DashboardOverview } from "@/components/dashboard-overview";
 import { getDashboardContext } from "@/lib/auth/session";
+import { getSiteTelemetry } from "@/lib/telemetry/readings";
 
 async function DashboardPageContent() {
   const context = await getDashboardContext();
+  const telemetry = context.selectedSite
+    ? await getSiteTelemetry(context.selectedSite.id)
+    : { devices: [], readings: [] };
 
   return (
     <DashboardOverview
@@ -15,6 +19,8 @@ async function DashboardPageContent() {
       sites={context.sites}
       selectedSite={context.selectedSite}
       activeOrganization={context.activeOrganization}
+      devices={telemetry.devices}
+      readings={telemetry.readings}
     />
   );
 }

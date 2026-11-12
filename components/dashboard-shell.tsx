@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, LayoutDashboard, LogOut, Sun } from "lucide-react";
+import { Activity, Droplets, LayoutDashboard, LogOut, Sun } from "lucide-react";
 
 import { BrandMark } from "@/components/brand-mark";
 import { SiteSwitcher } from "@/components/site-switcher";
@@ -8,6 +8,7 @@ import type { OrganizationWithRole, Site } from "@/lib/types/database";
 
 const nav = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/dashboard/tanks", label: "Tanks", icon: Droplets },
   { href: "/dashboard", label: "Sites", icon: Sun },
   { href: "/dashboard", label: "Live feed", icon: Activity },
 ];

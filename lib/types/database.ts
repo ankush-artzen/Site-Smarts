@@ -44,6 +44,62 @@ export type OrganizationWithRole = Organization & {
   role: OrgRole;
 };
 
+export type SiteDevice = {
+  id: string;
+  name: string;
+  device_type: string;
+  status: string;
+  battery_voltage: number | null;
+  last_seen_at: string | null;
+};
+
+export type SiteReading = {
+  id: string;
+  device_id: string;
+  distance_mm: number | null;
+  battery_voltage: number | null;
+  rssi: number | null;
+  snr: number | null;
+  fill_percentage: number | null;
+  volume_litres: number | null;
+  received_at: string;
+};
+
+export type SiteTelemetry = {
+  devices: SiteDevice[];
+  readings: SiteReading[];
+};
+
+export type TankType = "water" | "wastewater";
+
+export type Tank = {
+  id: string;
+  organization_id: string;
+  site_id: string;
+  sensor_device_id: string | null;
+  name: string;
+  tank_type: TankType;
+  length_mm: number | null;
+  width_mm: number | null;
+  height_mm: number | null;
+  sensor_mounting_height_mm: number | null;
+  usable_capacity_l: number;
+  dead_space_mm: number;
+  low_level_threshold: number;
+  high_level_threshold: number;
+  calibration_offset_mm: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TankSensor = {
+  id: string;
+  name: string;
+  dev_eui: string | null;
+  status: string;
+};
+
 export type DashboardContext = {
   userId: string;
   email: string;

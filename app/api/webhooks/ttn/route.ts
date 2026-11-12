@@ -94,7 +94,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const event = await request.json();
+    let event: { data?: TTNUplink } & TTNUplink;
+    try {
+      event = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Expected a JSON body" },
+        { status: 400 }
+      );
+    }
+
+    if (!event || typeof event !== "object") {
+      return NextResponse.json(
+        { error: "Expected a JSON object" },
+        { status: 400 }
+      );
+    }
 
     const ttnData = (event.data ?? event) as TTNUplink;
 

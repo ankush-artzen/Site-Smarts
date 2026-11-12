@@ -18,13 +18,17 @@
     "recharts": "^3.10.1",
     "zod": "^4.6.7"
   },
+  "overrides": {
+    "magic-string": "0.30.17"
+  },
   "devDependencies": {
-    "@tailwindcss/turbopack": "^4",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.4",
+    "magic-string": "0.30.17",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
